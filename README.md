@@ -71,6 +71,75 @@ When synchronizing agent memory across multiple machines (e.g., workstation and 
 
 ---
 
+## Embedding-Model Independence
+
+> **Core Invariant:** *"Notes are text + metadata; vectors are derived."*
+> `docs.json` is the single source of truth. `index.faiss` is a disposable, regenerable projection.
+
+Vector databases frequently lock users into their initial embedding model because text and vectors are tightly coupled in proprietary binary segments. In Tree-RAG (`scoped_memory/swap.py`), every workspace stores canonical human-readable records in `docs.json` alongside a derived `index.faiss` (`IndexFlatIP`). Upgrading or swapping the embedding model—even across different vector dimensions (e.g., `384-d` → `768-d` or `1536-d`)—never risks losing a single note:
+
+1. **Swap Planning (`plan_swap(store, new_model) -> SwapPlan`):**
+   - Inspects all workspaces, counts documents in `docs.json`, estimates token cost, and compares `expected_dim` against `new_model.dim`.
+   - If dimensions differ, sets `requires_full_rebuild=True` and reports that `index.faiss` will be rebuilt from `docs.json` with **zero text or metadata loss**.
+2. **Crash-Safe Atomic Execution (`execute_swap(store, new_model, batch_size=8, resume_from=0) -> SwapReport`):**
+   - Snapshots existing `index.faiss` files into `_pre_swap_backup_<timestamp>/`.
+   - Re-embeds all passages from `docs.json` in batches while checkpointing progress and intermediate vectors to `swap_state.json` (allowing interrupted swaps to resume from the last completed batch).
+   - Atomically replaces `index.faiss` (`tmp + fsync + POSIX rename`) and writes `embed_model.json` (`model_hash`, `dim`, `version`) without modifying `docs.json` (preserving byte-for-byte identity).
+
+### Choosing an Embedding Model (Trade-offs)
+
+| Tier / Class | Typical Parameters & Dim | Compute Target & VRAM | Latency (Batch=8) | Best For |
+| :--- | :--- | :--- | :--- | :--- |
+| **Compact CPU (~100M)** | ~100M params (`384-d`) | Host/Edge CPU (**0 MB GPU VRAM**) | ~150–300 ms | Local LLM workstations where 100% of GPU VRAM is reserved for LLM weights & KV-cache |
+| **Mid-Size GPU (~700M)** | 500M–700M params (`768-d` / `1024-d`) | Dedicated GPU (~1.5 GB VRAM) | ~20–45 ms | High-throughput multi-agent servers with spare VRAM |
+| **Hosted API** | Commercial / Frontier (`1536-d` – `3072-d`) | Remote API (**0 MB local RAM/VRAM**) | ~120–400 ms (network) | Cloud-ok workflows requiring zero local compute overhead |
+
+```bash
+python examples/swap_demo.py --from-dim 8 --to-dim 16 --base-dir /tmp/swap-demo
+```
+
+---
+
+## Universal RAG Sync
+
+Tree-RAG includes a standalone, delta-based synchronization engine (`scoped_memory/sync.py`) via `RAGSyncEngine(local_store, peer, transport, conflict_policy)` with **zero dependency on Syncthing**:
+
+- **Pluggable `DeltaTransport`:** Separates synchronization logic from the wire protocol via `push_delta(workspace, delta: list[Doc]) -> PushResult` and `pull_delta(workspace, since_hash: str) -> list[Doc]`:
+  - `LocalFsTransport`: Direct filesystem-to-filesystem (`path <-> path` or `store <-> store`) delta sync for local multi-agent clusters and offline tests.
+  - `HttpTransport`: REST/HTTP transport (`http://peer-node.example:PORT/v1`) for remote peer nodes.
+  - Custom transports (e.g., Syncthing folder watcher, gRPC stream, or CRDT log) can be plugged in by implementing the two-method `DeltaTransport` ABC.
+- **Configurable `ConflictPolicy`:**
+  - `UnionMerge` *(default)*: Lossless union combining SHA-256 content-hash deduplication with cosine near-duplicate filtering (`>= 0.955`).
+  - `FirstWriteWins`: Preserves the earliest recorded document version on ID/hash collisions.
+  - `LastWriteWins`: Overwrites colliding entries with the most recent timestamp.
+- **Delta-Only Transfers & Pre-Persistence Security:**
+  - `sync_workspace(workspace, direction="bidirectional")` transfers **only** documents added or modified since `last_sync_hash`.
+  - Every `push_delta` and `pull_delta` passes through `sanitize.scrub_secrets()` and validates vector dimensionality (`dim`) before writing, rejecting mismatched vectors.
+
+```mermaid
+sequenceDiagram
+    participant Local as local (ScopedMemoryStore)
+    participant Engine as RAGSyncEngine
+    participant Peer as peer (DeltaTransport)
+
+    Local->>Engine: collect delta since last_sync_hash
+    Engine->>Peer: local --push_delta--> peer (scrub_secrets + dim check)
+    Peer->>Engine: peer --pull_delta--> local (since_hash)
+    Engine->>Local: apply ConflictPolicy (UnionMerge | FirstWriteWins | LastWriteWins)
+```
+
+```mermaid
+flowchart LR
+    local[local] -- push_delta --> peer[peer]
+    peer -- pull_delta --> local
+```
+
+```bash
+python examples/sync_demo.py --base-a /tmp/sync-a --base-b /tmp/sync-b --direction bidirectional
+```
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -104,6 +173,8 @@ All Workspaces Tagged with workspace=...]
 | `scoped_memory/locks.py` | Per-workspace non-blocking POSIX `flock` (`<ws>/.lock`) and global merger lock (`.global.lock`) |
 | `scoped_memory/guard.py` | `ConcurrencyGuard`, `_pending/<ws>/*.md` queue, conflict-free union merge, `PeerNode` & `SyncPolicy` |
 | `scoped_memory/embed.py` | `Embedder` ABC, `CpuHttpEmbedder` (~100M params CPU offload), `MockEmbedder`, sentence-boundary `chunk_text` |
+| `scoped_memory/swap.py` | `EmbeddingModelConfig`, `plan_swap()`, `execute_swap()`, `SwapPlan`, `SwapReport` (model-agnostic atomic re-embed) |
+| `scoped_memory/sync.py` | `RAGSyncEngine`, `DeltaTransport`, `LocalFsTransport`, `HttpTransport`, `ConflictPolicy`, `SyncReport` |
 | `scoped_memory/sanitize.py` | `_scrub_secrets()` (redacts API/OAuth tokens), `sanitize()` workspace slug normalizer, `text_hash()` |
 
 ---
