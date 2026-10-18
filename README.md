@@ -140,6 +140,89 @@ python examples/sync_demo.py --base-a /tmp/sync-a --base-b /tmp/sync-b --directi
 
 ---
 
+## Memory MCP Hub (FastMCP Server + Web Dashboard)
+
+Tree-RAG includes a complete **Memory MCP Hub** composed of:
+
+1. **Production FastMCP Stdio Server (`scoped_memory/mcp_server.py`):**
+   - Exposes `memory_save`, `memory_search`, `memory_list`, `memory_health`, and `memory_merge_pending` over the Model Context Protocol (`stdio`).
+   - Maps every record category to a 4-tier **Memory Pyramid (`L0`–`L3`)** and **4 Memory Pillars**:
+     - **L3 Persona & Invariants (`skill` pillar):** `decision`, `skill`
+     - **L2 Scenario & Architecture (`code` / `wiki` pillars):** `code`, `wiki`
+     - **L1 Atomic Facts (`code` / `chat` pillars):** `bug`, `assumption`
+     - **L0 Raw Context (`chat` pillar):** `note`
+   - Uses `CpuHttpEmbedder` when `TREE_RAG_EMBED_URL` is set, and automatically falls back to deterministic `MockEmbedder` when unset.
+   - Configurable process-pattern concurrency detection (`TREE_RAG_CONCURRENCY_PATTERNS`, disabled by default) with non-blocking fallback to `_pending/<workspace>/*.md`.
+2. **Standalone Node.js Dashboard (`dashboard/`):**
+   - Zero-dependency Node 18+ HTTP server (`dashboard/server.js`) + dark glassmorphism single-page UI (`dashboard/index.html`, `dashboard/app.js`, `dashboard/style.css`).
+   - Features interactive **L0 → L3 Pyramid** and **4 Memory Pillars** filters, **Hierarchical RAG Tree Explorer**, **2D Force/Radial Graph Canvas**, **Live Semantic Search with Tree Auto-Highlight**, **FAISS Nearest-Neighbors & Same-Source Drill-Down**, **CRUD Modal**, **Mermaid Symbolic Memory Canvas**, and **Live `_telemetry.jsonl` Call Log**.
+   - Delegates vector search and neighbor reconstruction to `dashboard/search_sidecar.py` when `scoped_memory` is importable, or falls back transparently to deterministic lexical/n-gram cosine scoring in pure Node.js.
+
+```text
++-------------------------------------------------------------------------+
+| Autonomous Coding Agents (Claude Code / OpenCode / Cursor / CLI)        |
++------------------------------------+------------------------------------+
+                                     | MCP stdio (JSON-RPC)
+                                     v
++-------------------------------------------------------------------------+
+| scoped_memory/mcp_server.py (FastMCP Server)                            |
+|  - Tools: memory_save, memory_search, memory_list, memory_health,       |
+|           memory_merge_pending                                          |
+|  - L0-L3 Pyramid & 4 Pillars tagging + secret scrubbing + telemetry     |
++------------------------------------+------------------------------------+
+                                     |
+                                     v
++-------------------------------------------------------------------------+
+| On-Disk Per-Workspace Layout (TREE_RAG_BASE_DIR, default ./.treerag_data)|
+|  ├── <workspace>/docs.json         (canonical text, tags, layer, pillar)|
+|  ├── <workspace>/index.faiss       (FAISS IndexFlatIP 384d vectors)     |
+|  ├── _pending/<workspace>/*.md     (read-only concurrency queue)        |
+|  └── _telemetry.jsonl              (MCP & dashboard operation log)      |
++------------------------------------+------------------------------------+
+                                     ^
+                                     | stdio JSON-Lines (or lexical fallback)
++------------------------------------+------------------------------------+
+| dashboard/server.js (Node 18+ HTTP Server, zero npm dependencies)       |
+|  └── dashboard/search_sidecar.py (FAISS vector search & neighbors)      |
+|  └── Web UI (http://127.0.0.1:8095): L0-L3 Pyramid, 4 Pillars,          |
+|      Interactive Tree & 2D Graph Canvas, Drill-Down, Mermaid Canvas     |
++-------------------------------------------------------------------------+
+```
+
+### Running the MCP Server & Dashboard
+
+```bash
+# Inspect MCP tool definitions (no FastMCP runtime required)
+python -m scoped_memory.mcp_server --print-tools
+
+# Start the FastMCP stdio server (requires `pip install -e ".[mcp]"`)
+TREE_RAG_BASE_DIR=./.treerag_data python -m scoped_memory.mcp_server --stdio
+
+# Launch the standalone Memory MCP Hub web dashboard on port 8095
+node dashboard/server.js --port 8095 --base-dir ./examples/sample_base
+
+# Run the automated Node smoke test & end-to-end demo script
+node dashboard/test/smoke.js
+bash examples/hub_demo.sh
+```
+
+### Environment Variables Reference
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `TREE_RAG_BASE_DIR` | `./.treerag_data` | Base directory containing `<workspace>/docs.json`, `<workspace>/index.faiss`, and `_pending/` |
+| `TREE_RAG_EMBED_URL` | *(unset → `MockEmbedder`)* | OpenAI-compatible `/v1` endpoint for 384-d embeddings (e.g. `http://127.0.0.1:8089/v1` running `e5-small`) |
+| `TREE_RAG_EMBED_URL_PLUS` | *(unset)* | Optional secondary `/v1` endpoint for a custom 4096-dim embedding model (`mode="plus"`) |
+| `TREE_RAG_EMBED_MODEL` | `intfloat/multilingual-e5-small` | Model identifier sent to `TREE_RAG_EMBED_URL` |
+| `MEMORY_WORKSPACE` / `TREE_RAG_DEFAULT_WORKSPACE` | `default` | Default workspace branch when `workspace` is omitted in tool calls |
+| `MEMORY_EMBED_TIMEOUT` | `15.0` | HTTP request timeout (seconds) for embedding calls |
+| `TREE_RAG_CONCURRENCY_PATTERNS` | *(disabled)* | Comma-separated process regex patterns that trigger read-only `_pending/` queueing |
+| `TREE_RAG_MIN_SCORE` | `0.25` | Minimum cosine similarity threshold before returning workspace hits |
+| `TREE_RAG_DASHBOARD_PORT` | `8095` | HTTP port for `dashboard/server.js` |
+| `TREE_RAG_DASHBOARD_HOST` | `127.0.0.1` | Bind address for `dashboard/server.js` |
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -162,11 +245,12 @@ Zero Context Pollution]
 All Workspaces Tagged with workspace=...]
 ```
 
-### Package Layout (`scoped_memory/`)
+### Repository & Package Layout
 
-| Module | Responsibility |
+| Path / Module | Responsibility |
 | :--- | :--- |
 | `scoped_memory/store.py` | `ScopedMemoryStore` facade: per-workspace `save`, `search`, `list`, `merge_pending`, `heal_workspace`, `health` |
+| `scoped_memory/mcp_server.py` | Production FastMCP stdio server (`MemoryMcpServer`, `build_fastmcp_app`, `generate_mermaid_canvas`, L0–L3 & 4-Pillar taxonomy) |
 | `scoped_memory/index.py` | `WorkspaceIndex`: per-branch FAISS `IndexFlatIP` + `docs.json`, optimistic `(mtime, size)` reload, vector reconstruction |
 | `scoped_memory/hierarchy.py` | `HierarchyEngine`, `EmptyContext`, `SearchResult`, `SearchHit`, and `requires_confirmation()` HITL gate |
 | `scoped_memory/atomic.py` | `_atomic_write_json()` and `_atomic_write_faiss()` (`tmp + fsync + dir fsync + rename`) |
@@ -176,6 +260,8 @@ All Workspaces Tagged with workspace=...]
 | `scoped_memory/swap.py` | `EmbeddingModelConfig`, `plan_swap()`, `execute_swap()`, `SwapPlan`, `SwapReport` (model-agnostic atomic re-embed) |
 | `scoped_memory/sync.py` | `RAGSyncEngine`, `DeltaTransport`, `LocalFsTransport`, `HttpTransport`, `ConflictPolicy`, `SyncReport` |
 | `scoped_memory/sanitize.py` | `_scrub_secrets()` (redacts API/OAuth tokens), `sanitize()` workspace slug normalizer, `text_hash()` |
+| `dashboard/` | Standalone Node.js Memory MCP Hub (`server.js`, `index.html`, `app.js`, `style.css`, `search_sidecar.py`, `test/smoke.js`) |
+| `examples/` | Runnable demos (`demo_zero_pollution.py`, `mcp_server.py`, `swap_demo.py`, `sync_demo.py`, `hub_demo.sh`, `sample_base/`) |
 
 ---
 
