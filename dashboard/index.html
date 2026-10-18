@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory MCP Hub — Hierarchical Tree RAG &amp; Telemetry</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Optional Mermaid.js from CDN; falls back to interactive cards & raw <pre> when offline -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="stars-overlay"></div>
+
+    <div class="container">
+        <!-- Top Hub Header -->
+        <header class="hub-top-header">
+            <div>
+                <div class="logo-area">
+                    <span class="logo-dot"></span>
+                    <h1>Memory MCP Hub — Hierarchical Tree RAG &amp; Telemetry</h1>
+                </div>
+                <p class="subtitle">
+                    Scoped FAISS Vector Branches · L0→L3 Hierarchical Memory Pyramid · 4 Memory Pillars · Zero Context Pollution
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button onclick="openMemRagSaveModal()" style="background: linear-gradient(135deg, #a855f7, #7c3aed); border: none; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(168,85,247,0.3);">
+                    ➕ Add Memory Entry
+                </button>
+                <button onclick="triggerMemRagMergePending()" id="btn-memrag-merge" style="background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; padding: 8px 13px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+                    ⚡ Merge Pending
+                </button>
+                <button onclick="triggerMemRagWorkspaceSync()" id="btn-memrag-wssync" style="background: rgba(59, 130, 246, 0.16); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; padding: 8px 13px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;" title="Heal conflicts and verify FAISS workspace indices">
+                    🔗 Workspace Sync
+                </button>
+                <button onclick="toggleMemRagMermaidPanel()" style="background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.4); color: #f9a8d4; padding: 8px 13px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+                    🗺️ Symbolic Canvas (Mermaid)
+                </button>
+                <button onclick="loadMemoryRagTree(true); refreshMemoryStatus();" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: white; padding: 8px 13px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">
+                    ↻ Refresh Tree
+                </button>
+            </div>
+        </header>
+
+        <!-- Memory MCP Status Card -->
+        <section class="card glass-card" id="card-memoryMcp" style="margin-bottom: 22px;">
+            <div class="card-glow" style="background: radial-gradient(120px circle at 50% 50%, rgba(168, 85, 247, 0.18), transparent 80%);"></div>
+            <div class="card-header">
+                <div class="icon-bg">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2z"/>
+                        <path d="M12 6v6l4 2"/>
+                        <path d="M16 8h4"/><path d="M16 12h4"/><path d="M16 16h4"/>
+                    </svg>
+                </div>
+                <div class="title-section" style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <h2>Memory MCP Engine Status (Tree-RAG + Concurrency Guard)</h2>
+                        <span class="status-badge status-starting" id="status-memoryMcp">Checking...</span>
+                    </div>
+                    <p class="description" style="margin-bottom: 0; margin-top: 4px;">
+                        Per-workspace vector indices (<code>docs.json</code> + <code>index.faiss</code>) with CPU embedding offload and automatic <code>_pending</code> queue fallback.
+                    </p>
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
+                        <div style="font-size: 0.72rem; color: var(--text-secondary);">Primary Workspace</div>
+                        <div id="memory-stat-primary-docs" style="font-size: 1.05rem; font-weight: 700; color: #c084fc; margin-top: 2px;">—</div>
+                        <div id="memory-stat-primary-index" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">index.faiss: —</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
+                        <div style="font-size: 0.72rem; color: var(--text-secondary);">Workspaces (Branches)</div>
+                        <div id="memory-stat-workspaces" style="font-size: 1.05rem; font-weight: 700; color: #60a5fa; margin-top: 2px;">—</div>
+                        <div id="memory-stat-embed" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">embedder: —</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
+                        <div style="font-size: 0.72rem; color: var(--text-secondary);">Pending Queue (_pending)</div>
+                        <div id="memory-stat-pending" style="font-size: 1.05rem; font-weight: 700; color: #34d399; margin-top: 2px;">0 files</div>
+                        <div id="memory-stat-concurrent" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">guard: —</div>
+                    </div>
+                </div>
+                <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                        <span style="font-size: 0.76rem; font-weight: 600; color: var(--text-secondary);">Active Workspace Branches:</span>
+                        <span id="memory-base-path" style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace;"></span>
+                    </div>
+                    <div id="memory-workspaces-list" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.75rem;">
+                        <span style="color: var(--text-secondary);">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Memory Hub Content -->
+        <div id="content-memory-rag">
+            <!-- Top KPI & Health Strip -->
+            <div class="card glass-card" style="margin-bottom: 20px; border: 1px solid rgba(168, 85, 247, 0.35); background: linear-gradient(135deg, rgba(168, 85, 247, 0.09) 0%, rgba(15, 23, 42, 0.78) 55%, rgba(6, 182, 212, 0.08) 100%);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px;">
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px;">
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Total Records (Docs)</div>
+                        <div id="memrag-kpi-docs" style="font-size: 1.35rem; font-weight: 800; color: #f3e8ff; margin-top: 2px;">—</div>
+                        <div id="memrag-kpi-ws" style="font-size: 0.72rem; color: #c084fc;">in — workspaces</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px;">
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">FAISS Vector Size</div>
+                        <div id="memrag-kpi-bytes" style="font-size: 1.35rem; font-weight: 800; color: #93c5fd; margin-top: 2px;">—</div>
+                        <div id="memrag-kpi-embed-status" style="font-size: 0.72rem; color: var(--text-secondary);">e5-small (384d) + Plus (4096d)</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px;">
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">L3 Rules &amp; Skills</div>
+                        <div id="memrag-kpi-l3" style="font-size: 1.35rem; font-weight: 800; color: #fcd34d; margin-top: 2px;">—</div>
+                        <div style="font-size: 0.72rem; color: #fde68a;">decision + skill</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px;">
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">L2 Code &amp; Wiki</div>
+                        <div id="memrag-kpi-l2" style="font-size: 1.35rem; font-weight: 800; color: #67e8f9; margin-top: 2px;">—</div>
+                        <div style="font-size: 0.72rem; color: #a5f3fc;">code + wiki</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px;">
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">L1 Bugs &amp; Facts</div>
+                        <div id="memrag-kpi-l1" style="font-size: 1.35rem; font-weight: 800; color: #fda4af; margin-top: 2px;">—</div>
+                        <div style="font-size: 0.72rem; color: #fecdd3;">bug + assumption</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px;">
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Telemetry &amp; Pending</div>
+                        <div id="memrag-kpi-telemetry" style="font-size: 1.35rem; font-weight: 800; color: #6ee7b7; margin-top: 2px;">0 calls</div>
+                        <div id="memrag-kpi-pending" style="font-size: 0.72rem; color: var(--text-secondary);">pending: 0 · avg: 0 ms</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Hierarchical Memory Pyramid (L0->L3) + 4 Memory Pillars -->
+            <div class="memrag-arch-grid" style="display: grid; grid-template-columns: 1.05fr 1.25fr; gap: 18px; margin-bottom: 20px;">
+                <!-- L0 -> L3 Pyramid Card -->
+                <div class="card glass-card" style="border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1rem; color: #f3f4f6;">🏛️ Hierarchical Memory Architecture (L0 → L3 Pyramid)</h3>
+                            <p style="margin: 2px 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">Click a layer to filter the RAG tree and records</p>
+                        </div>
+                        <button onclick="setMemRagLayerFilter('')" id="btn-memrag-clear-layer" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #e5e7eb; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">Clear Layer Filter</button>
+                    </div>
+                    <div id="memrag-pyramid-bars" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- 4 Memory Pillars Card -->
+                <div class="card glass-card" style="border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1rem; color: #f3f4f6;">🧭 4 Memory Pillars</h3>
+                            <p style="margin: 2px 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">Semantic classification of agent knowledge across domains</p>
+                        </div>
+                        <button onclick="setMemRagPillarFilter('')" id="btn-memrag-clear-pillar" style="display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #e5e7eb; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">Clear Pillar Filter</button>
+                    </div>
+                    <div id="memrag-pillars-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3: Live Semantic Vector Search + Tree Branch Auto-Highlighter -->
+            <div class="card glass-card" style="margin-bottom: 20px; border: 1px solid rgba(6, 182, 212, 0.35);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">🔎</span>
+                        <h3 style="margin: 0; font-size: 1rem; color: #67e8f9;">Live Semantic Vector Search (FAISS + Auto-Highlight RAG Tree)</h3>
+                    </div>
+                    <div id="memrag-search-meta" style="font-size: 0.75rem; color: var(--text-secondary); font-family: monospace;"></div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <input type="text" id="memrag-search-input" placeholder="Enter a semantic query (e.g. 'rate limiter retry backoff', 'OAuth token refresh bug')..."
+                           onkeydown="if(event.key==='Enter') runMemRagSemanticSearch()"
+                           style="flex: 1; min-width: 260px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: white; padding: 10px 14px; border-radius: 8px; font-size: 0.88rem;">
+                    <select id="memrag-search-ws" style="background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: white; padding: 10px 12px; border-radius: 8px; font-size: 0.82rem;">
+                        <option value="global">🌐 Global (all workspaces)</option>
+                    </select>
+                    <select id="memrag-search-cat" style="background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); color: white; padding: 10px 12px; border-radius: 8px; font-size: 0.82rem;">
+                        <option value="">All categories</option>
+                        <option value="decision">decision (L3)</option>
+                        <option value="skill">skill (L3)</option>
+                        <option value="code">code (L2)</option>
+                        <option value="wiki">wiki (L2)</option>
+                        <option value="bug">bug (L1)</option>
+                        <option value="assumption">assumption (L1)</option>
+                        <option value="note">note (L0)</option>
+                    </select>
+                    <select id="memrag-search-mode" style="background: rgba(0,0,0,0.45); border: 1px solid rgba(168,85,247,0.4); color: #e9d5ff; padding: 10px 12px; border-radius: 8px; font-size: 0.82rem;">
+                        <option value="base">⚡ e5-small (384d CPU)</option>
+                        <option value="plus">🧠 Custom Plus Model (4096d, env)</option>
+                    </select>
+                    <button onclick="runMemRagSemanticSearch()" id="btn-memrag-search" style="background: linear-gradient(135deg, #06b6d4, #3b82f6); border: none; color: white; padding: 10px 18px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer;">
+                        🔍 Search FAISS
+                    </button>
+                    <button onclick="clearMemRagSearchHighlights()" id="btn-memrag-search-clear" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 13px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">
+                        ✕ Clear Hits
+                    </button>
+                </div>
+                <div id="memrag-search-results" style="display: none; margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;"></div>
+            </div>
+
+            <!-- Optional Mermaid Symbolic Memory Canvas Panel -->
+            <div id="memrag-mermaid-panel" class="card glass-card" style="display: none; margin-bottom: 20px; border: 1px solid rgba(236, 72, 153, 0.4);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h3 style="margin: 0; font-size: 1rem; color: #f9a8d4;">🗺️ Symbolic Memory Canvas (Mermaid Flowchart)</h3>
+                        <select id="memrag-mermaid-ws" onchange="loadMemRagMermaid(this.value)" style="background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 5px 10px; border-radius: 6px; font-size: 0.78rem;">
+                            <option value="global">Global Hub</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="copyMemRagMermaidCode()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 5px 11px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">📋 Copy Mermaid Code</button>
+                        <button onclick="toggleMemRagMermaidPanel()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #9ca3af; padding: 5px 11px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Close</button>
+                    </div>
+                </div>
+                <div id="memrag-mermaid-render" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px; overflow-x: auto;"></div>
+                <details style="margin-top: 8px;">
+                    <summary style="cursor: pointer; font-size: 0.75rem; color: var(--text-secondary);">Show raw Mermaid source (`flowchart LR`)</summary>
+                    <pre id="memrag-mermaid-code" style="margin-top: 6px; background: rgba(0,0,0,0.55); padding: 10px; border-radius: 8px; font-size: 0.74rem; color: #f9a8d4; overflow-x: auto;"></pre>
+                </details>
+            </div>
+
+            <!-- Row 4: Dual Interactive Explorer (Left: Tree / 2D Graph Canvas | Right: Node Records & Drill-Down) -->
+            <div class="memrag-explorer-grid" style="display: grid; grid-template-columns: 430px 1fr; gap: 18px; margin-bottom: 20px; align-items: start;">
+                <!-- Left Column: Interactive RAG Tree + 2D Graph Canvas -->
+                <div class="card glass-card" style="border: 1px solid rgba(168, 85, 247, 0.28); padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; flex-wrap: wrap;">
+                        <h3 style="margin: 0; font-size: 0.96rem; color: #e9d5ff;">🌲 RAG Tree Structure</h3>
+                        <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.4); padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                            <button id="btn-memrag-view-tree" onclick="switchMemRagExplorerMode('tree')" style="background: rgba(168, 85, 247, 0.3); border: 1px solid #a855f7; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">Tree</button>
+                            <button id="btn-memrag-view-graph" onclick="switchMemRagExplorerMode('graph')" style="background: transparent; border: 1px solid transparent; color: var(--text-secondary); padding: 4px 10px; border-radius: 6px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">2D Graph Canvas</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+                        <input type="text" id="memrag-tree-filter" placeholder="Filter workspace / category / source..."
+                               oninput="renderMemRagTreeExplorer()"
+                               style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: white; padding: 6px 10px; border-radius: 7px; font-size: 0.78rem;">
+                        <button onclick="expandCollapseAllMemRagTree(true)" title="Expand all branches" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #d1d5db; padding: 5px 8px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">➕</button>
+                        <button onclick="expandCollapseAllMemRagTree(false)" title="Collapse all branches" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #d1d5db; padding: 5px 8px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">➖</button>
+                    </div>
+
+                    <!-- Hierarchical Tree DOM View -->
+                    <div id="memrag-tree-container" style="max-height: 620px; overflow-y: auto; padding-right: 4px; font-size: 0.81rem;">
+                        <div style="color: var(--text-secondary); padding: 20px; text-align: center;">Loading RAG tree...</div>
+                    </div>
+
+                    <!-- Interactive 2D Force/Radial Graph Canvas View -->
+                    <div id="memrag-graph-container" style="display: none;">
+                        <div style="position: relative; background: radial-gradient(circle at center, rgba(30, 27, 75, 0.55), rgba(5, 6, 12, 0.92)); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;">
+                            <canvas id="memrag-graph-canvas" width="395" height="490" style="width: 100%; height: 490px; display: block; cursor: grab;"></canvas>
+                            <div style="position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
+                                <button onclick="resetMemRagGraphView()" style="background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 3px 8px; border-radius: 5px; font-size: 0.68rem; cursor: pointer;">🎯 Center</button>
+                                <button onclick="zoomMemRagGraph(1.2)" style="background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 3px 8px; border-radius: 5px; font-size: 0.68rem; cursor: pointer;">＋</button>
+                                <button onclick="zoomMemRagGraph(0.82)" style="background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 3px 8px; border-radius: 5px; font-size: 0.68rem; cursor: pointer;">－</button>
+                                <button onclick="toggleMemRagGraphLayout()" id="btn-memrag-graph-layout" style="background: rgba(168,85,247,0.35); border: 1px solid rgba(168,85,247,0.6); color: #f3e8ff; padding: 3px 8px; border-radius: 5px; font-size: 0.68rem; cursor: pointer;">Layout: Radial</button>
+                                <button onclick="toggleMemRagHideEmpty()" id="btn-memrag-hide-empty" style="background: rgba(16,185,129,0.28); border: 1px solid rgba(16,185,129,0.55); color: #a7f3d0; padding: 3px 8px; border-radius: 5px; font-size: 0.68rem; cursor: pointer;">Hide Empty: ON</button>
+                            </div>
+                            <div id="memrag-graph-tooltip" style="position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 5px 8px; font-size: 0.7rem; color: #d1d5db; pointer-events: none;">
+                                Click a node to inspect records · Drag to pan · Scroll to zoom
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Node Inspector, Records List & Vector Neighbors Drill-Down -->
+                <div class="card glass-card" style="border: 1px solid rgba(255,255,255,0.09); padding: 18px;">
+                    <!-- Breadcrumb & Active Node Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px;">
+                        <div>
+                            <div id="memrag-breadcrumb" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.82rem; color: #c084fc; font-weight: 600;">
+                                <span>🌐 Global Hub</span>
+                            </div>
+                            <div id="memrag-inspector-subtitle" style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;">
+                                Showing latest memory records from the selected RAG branch
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="memrag-records-q" placeholder="Quick text/tag filter..."
+                                   oninput="debounceLoadMemRagRecords()"
+                                   style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.14); color: white; padding: 6px 10px; border-radius: 7px; font-size: 0.78rem; width: 190px;">
+                            <button onclick="selectMemRagNode('global', '', '')" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #d1d5db; padding: 6px 10px; border-radius: 7px; font-size: 0.74rem; cursor: pointer;">
+                                Reset Selection
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Top Tags Bar -->
+                    <div id="memrag-tags-bar" style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px;"></div>
+
+                    <!-- Records List -->
+                    <div id="memrag-records-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 600px; overflow-y: auto; padding-right: 4px;">
+                        <div style="color: var(--text-secondary); padding: 25px; text-align: center;">Loading memory records...</div>
+                    </div>
+
+                    <!-- Pagination Footer -->
+                    <div id="memrag-records-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 0.76rem; color: var(--text-secondary);"></div>
+                </div>
+            </div>
+
+            <!-- Row 5: Telemetry, Category Breakdown & Ingestion Timeline -->
+            <div class="memrag-telemetry-grid" style="display: grid; grid-template-columns: 1fr 1.25fr; gap: 18px; margin-bottom: 24px;">
+                <!-- Category Distribution & Timeline -->
+                <div class="card glass-card" style="border: 1px solid rgba(255,255,255,0.08);">
+                    <h3 style="margin: 0 0 10px 0; font-size: 0.96rem; color: #f3f4f6;">📊 Category Breakdown &amp; Ingestion Timeline</h3>
+                    <div id="memrag-category-breakdown" style="display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px;"></div>
+                    <div style="font-size: 0.76rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Ingestion Activity by Date:</div>
+                    <div id="memrag-timeline-chart" style="display: flex; align-items: flex-end; gap: 5px; height: 95px; padding: 8px; background: rgba(0,0,0,0.32); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);"></div>
+                </div>
+
+                <!-- Live MCP Telemetry Log -->
+                <div class="card glass-card" style="border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 0.96rem; color: #f3f4f6;">📡 Live MCP Call Telemetry (<code>_telemetry.jsonl</code>)</h3>
+                            <p style="margin: 2px 0 0 0; font-size: 0.73rem; color: var(--text-secondary);">Real-time log of <code>memory_search</code>, <code>memory_save</code>, and <code>memory_list</code> operations with latency</p>
+                        </div>
+                        <button onclick="loadMemoryRagTree(true)" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #d1d5db; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">↻ Refresh Logs</button>
+                    </div>
+                    <div id="memrag-telemetry-table" style="max-height: 235px; overflow-y: auto; font-size: 0.75rem; font-family: monospace;">
+                        <div style="color: var(--text-secondary); padding: 16px; text-align: center;">No telemetry entries recorded yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Create / Edit Memory Record -->
+            <div id="memrag-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+                <div style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.45); border-radius: 14px; width: 100%; max-width: 620px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.7);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                        <h3 id="memrag-modal-title" style="margin: 0; font-size: 1.05rem; color: #f3e8ff;">➕ Add New Entry to Memory MCP</h3>
+                        <button onclick="closeMemRagModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+                    </div>
+                    <input type="hidden" id="memrag-modal-id" value="">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Workspace (branch):</label>
+                            <input type="text" id="memrag-modal-ws" placeholder="e.g. sample_project" style="width: 100%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 8px 10px; border-radius: 7px; font-size: 0.83rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Category (Layer L0–L3):</label>
+                            <select id="memrag-modal-cat" style="width: 100%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 8px 10px; border-radius: 7px; font-size: 0.83rem;">
+                                <option value="decision">👑 decision (L3 Persona / Rule)</option>
+                                <option value="skill">⚡ skill (L3 Pattern / SOP)</option>
+                                <option value="code">💻 code (L2 Code / Architecture)</option>
+                                <option value="wiki">📖 wiki (L2 Documentation / Wiki)</option>
+                                <option value="bug">🐛 bug (L1 Bug + Root Cause)</option>
+                                <option value="assumption">📐 assumption (L1 Assumption)</option>
+                                <option value="note">📝 note (L0 Raw Note)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Source (file / module / agent):</label>
+                            <input type="text" id="memrag-modal-source" placeholder="e.g. src/auth/jwt.py" style="width: 100%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 8px 10px; border-radius: 7px; font-size: 0.83rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Tags (comma-separated):</label>
+                            <input type="text" id="memrag-modal-tags" placeholder="e.g. faiss, rag, security" style="width: 100%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 8px 10px; border-radius: 7px; font-size: 0.83rem;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 14px;">
+                        <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Observation Text (embedded into FAISS):</label>
+                        <textarea id="memrag-modal-text" rows="5" placeholder="Describe the architectural decision, root cause of a bug, or reusable pattern..." style="width: 100%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 10px; border-radius: 8px; font-size: 0.84rem; resize: vertical;"></textarea>
+                    </div>
+                    <div id="memrag-modal-status" style="font-size: 0.78rem; margin-bottom: 10px; min-height: 18px;"></div>
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button onclick="closeMemRagModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 8px 16px; border-radius: 8px; font-size: 0.83rem; cursor: pointer;">Cancel</button>
+                        <button onclick="submitMemRagModal()" id="btn-memrag-modal-save" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); border: none; color: white; padding: 8px 18px; border-radius: 8px; font-size: 0.83rem; font-weight: 600; cursor: pointer;">💾 Save &amp; Index</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

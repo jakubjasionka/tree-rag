@@ -1,0 +1,90 @@
+[
+  {
+    "id": "mem_a101f0c11001",
+    "text": "acme-weather-api decision: Use token-bucket rate limiting (120 req/min per API key) at the gateway layer with Redis sliding-window counters.",
+    "source": "docs/adr/001-rate-limiting.md",
+    "category": "decision",
+    "layer": "L3",
+    "pillar": "skill",
+    "tags": [
+      "acme-weather-api",
+      "rate-limit",
+      "redis",
+      "gateway"
+    ],
+    "time": "2026-02-10 09:15:00"
+  },
+  {
+    "id": "mem_a101f0c11002",
+    "text": "acme-weather-api code: ForecastCacheAdapter serializes hourly NOAA grid responses into compressed MessagePack blobs with a 15-minute TTL.",
+    "source": "src/acme_weather/cache.py",
+    "category": "code",
+    "layer": "L2",
+    "pillar": "code",
+    "tags": [
+      "acme-weather-api",
+      "cache",
+      "msgpack",
+      "forecast"
+    ],
+    "time": "2026-02-11 14:22:10"
+  },
+  {
+    "id": "mem_a101f0c11003",
+    "text": "acme-weather-api bug: Stale barometric pressure readings occurred when upstream station timestamps lacked explicit UTC offset; fixed by normalizing ISO-8601 inputs to timezone.utc.",
+    "source": "src/acme_weather/ingest.py",
+    "category": "bug",
+    "layer": "L1",
+    "pillar": "code",
+    "tags": [
+      "acme-weather-api",
+      "bugfix",
+      "timezone",
+      "utc"
+    ],
+    "time": "2026-02-12 11:05:44"
+  },
+  {
+    "id": "mem_a101f0c11004",
+    "text": "acme-weather-api note: Load testing showed p99 latency under 18ms for cached /v1/forecast queries across 50 concurrent worker threads.",
+    "source": "benchmarks/load_report_2026_02.md",
+    "category": "note",
+    "layer": "L0",
+    "pillar": "chat",
+    "tags": [
+      "acme-weather-api",
+      "benchmark",
+      "latency"
+    ],
+    "time": "2026-02-13 16:40:00"
+  },
+  {
+    "id": "mem_a101f0c11005",
+    "text": "acme-weather-api skill: Always wrap upstream radar tile HTTP fetches in an exponential backoff retry policy (base=200ms, max_retries=3, jitter=full).",
+    "source": "src/acme_weather/http_client.py",
+    "category": "skill",
+    "layer": "L3",
+    "pillar": "skill",
+    "tags": [
+      "acme-weather-api",
+      "retry",
+      "backoff",
+      "resilience"
+    ],
+    "time": "2026-02-14 10:12:30"
+  },
+  {
+    "id": "mem_a101f0c11006",
+    "text": "acme-weather-api wiki: Public OpenAPI specification is served at /v1/openapi.json and validated in CI using spectral lint rules.",
+    "source": "docs/runbook.md",
+    "category": "wiki",
+    "layer": "L2",
+    "pillar": "wiki",
+    "tags": [
+      "acme-weather-api",
+      "openapi",
+      "ci"
+    ],
+    "time": "2026-02-15 18:00:00"
+  }
+]

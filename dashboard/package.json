@@ -1,0 +1,15 @@
+{
+  "name": "tree-rag-dashboard",
+  "version": "0.3.0",
+  "description": "Standalone Memory MCP Hub — Hierarchical Tree RAG & Telemetry Dashboard for Tree-RAG (scoped_memory)",
+  "main": "server.js",
+  "private": false,
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  }
+}

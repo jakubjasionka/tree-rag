@@ -1,0 +1,61 @@
+[
+  {
+    "id": "mem_b202e0d22001",
+    "text": "acme-weather-api decision: Store historical telemetry aggregates in partitioned Parquet tables indexed by station_id and observation_month.",
+    "source": "docs/adr/002-storage-layout.md",
+    "category": "decision",
+    "layer": "L3",
+    "pillar": "skill",
+    "tags": [
+      "acme-weather-api",
+      "parquet",
+      "storage",
+      "telemetry"
+    ],
+    "time": "2026-02-16 08:30:00"
+  },
+  {
+    "id": "mem_b202e0d22002",
+    "text": "acme-weather-api code: AlertDispatcher evaluates severe wind-gust thresholds (>= 65 km/h) and publishes webhook events with HMAC-SHA256 signatures.",
+    "source": "src/alerts/dispatcher.py",
+    "category": "code",
+    "layer": "L2",
+    "pillar": "code",
+    "tags": [
+      "acme-weather-api",
+      "alerts",
+      "webhook",
+      "hmac"
+    ],
+    "time": "2026-02-17 13:45:12"
+  },
+  {
+    "id": "mem_b202e0d22003",
+    "text": "acme-weather-api bug: Duplicate webhook deliveries occurred during worker rebalance; resolved by recording idempotency keys per alert_id.",
+    "source": "src/alerts/dispatcher.py",
+    "category": "bug",
+    "layer": "L1",
+    "pillar": "code",
+    "tags": [
+      "acme-weather-api",
+      "webhook",
+      "idempotency",
+      "bugfix"
+    ],
+    "time": "2026-02-18 15:20:00"
+  },
+  {
+    "id": "mem_b202e0d22004",
+    "text": "acme-weather-api note: Demo workspace configured for staging verification of severe weather webhook subscriptions and synthetic sensor feeds.",
+    "source": "staging/README.md",
+    "category": "note",
+    "layer": "L0",
+    "pillar": "chat",
+    "tags": [
+      "acme-weather-api",
+      "staging",
+      "sensors"
+    ],
+    "time": "2026-02-19 17:10:00"
+  }
+]
