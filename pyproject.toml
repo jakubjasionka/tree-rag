@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tree-rag"
+version = "0.2.0"
+description = "Hierarchical Scoped Memory Engine (RAG) with deterministic zero-pollution guarantees, Human-in-the-Loop global escalation, CPU embedding offload, and conflict-free multi-node sync."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Tree-RAG Contributors" }]
+keywords = [
+    "rag",
+    "faiss",
+    "vector-database",
+    "agent-memory",
+    "hierarchical-memory",
+    "human-in-the-loop",
+    "mcp",
+]
+dependencies = [
+    "faiss-cpu>=1.8.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+http = [
+    "requests>=2.31.0",
+]
+mcp = [
+    "mcp>=1.0.0",
+    "requests>=2.31.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "requests>=2.31.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["scoped_memory*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = false
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
