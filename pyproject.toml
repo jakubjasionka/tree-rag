@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tree-rag"
-version = "0.2.0"
+version = "0.3.0"
 description = "Hierarchical Scoped Memory Engine (RAG) with deterministic zero-pollution guarantees, Human-in-the-Loop global escalation, CPU embedding offload, and conflict-free multi-node sync."
 readme = "README.md"
 license = { text = "MIT" }
@@ -54,6 +54,7 @@ strict = false
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
+exclude = ["dashboard/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

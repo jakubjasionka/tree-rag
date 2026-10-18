@@ -34,3 +34,30 @@ jobs:
 
       - name: Validate Docker Compose configuration
         run: docker compose config -q
+
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11 (for optional FAISS sidecar)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check dashboard JavaScript syntax
+        run: node --check dashboard/server.js && node --check dashboard/app.js
+
+      - name: Run dashboard smoke test
+        run: node dashboard/test/smoke.js
