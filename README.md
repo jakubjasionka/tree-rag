@@ -279,7 +279,9 @@ pytest -v
 
 ## Benchmarks
 
-No measured benchmark results are published yet. This repository intentionally contains no synthetic or estimated performance numbers. Benchmark tables will be added only after they are produced by a reproducible run on named hardware, with the exact command and raw output committed alongside.
+Measured results: [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md). Reproducible script: [`benchmarks/embed_latency.py`](benchmarks/embed_latency.py).
+
+Embedding latency (`intfloat/multilingual-e5-small`, 384-dim, loopback): batch=1 p50 **13.4 ms**, batch=10 p50 **31.4 ms**. No other performance figures are published yet.
 
 ---
 
