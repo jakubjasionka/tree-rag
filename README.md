@@ -13,7 +13,7 @@
 
 - **Zero Context Pollution (`EmptyContext`):** Unlike flat vector databases where `top_k` queries unconditionally return $k$ low-relevance neighbors, Tree-RAG partitions memory into isolated per-workspace FAISS branches (`<base_dir>/<workspace>/index.faiss` + `docs.json`). Empty or below-threshold workspaces deterministically return `EmptyContext` (`bool(ctx) is False`, `0` noise tokens injected).
 - **Human-in-the-Loop (HITL) Global Escalation:** When a local workspace branch misses (`ctx.requires_confirmation() is True`), the engine does not blindly search unrelated projects. It exposes an explicit escalation gate requiring agent/user confirmation (`confirmed=True` or approval callback) before traversing `scope="global"`.
-- **0 MB GPU VRAM Overhead (CPU Offload):** Designed to pair with a compact multilingual embedding model (~100M parameters, 384-d L2-normalized vectors) running entirely on host/edge CPU, preserving 100% of GPU VRAM for generative LLM weights and KV-cache.
+- **CPU Offload for Embeddings (design goal, not benchmarked):** Designed to pair with a compact multilingual embedding model (~100M parameters, 384-d L2-normalized vectors) running entirely on host/edge CPU, preserving 100% of GPU VRAM for generative LLM weights and KV-cache.
 - **Crash-Safe Atomic Persistence & Non-Blocking Concurrency:** All index and metadata writes execute via `tmp + fsync + directory fsync + POSIX rename` guarded by per-workspace `flock` (`<workspace>/.lock`). Concurrent writers on different workspaces never serialize globally; same-workspace lock contention falls back losslessly to a markdown pending queue (`_pending/<workspace>/*.md`).
 
 ---
@@ -90,9 +90,6 @@ Vector databases frequently lock users into their initial embedding model becaus
 
 | Tier / Class | Typical Parameters & Dim | Compute Target & VRAM | Latency (Batch=8) | Best For |
 | :--- | :--- | :--- | :--- | :--- |
-| **Compact CPU (~100M)** | ~100M params (`384-d`) | Host/Edge CPU (**0 MB GPU VRAM**) | ~150–300 ms | Local LLM workstations where 100% of GPU VRAM is reserved for LLM weights & KV-cache |
-| **Mid-Size GPU (~700M)** | 500M–700M params (`768-d` / `1024-d`) | Dedicated GPU (~1.5 GB VRAM) | ~20–45 ms | High-throughput multi-agent servers with spare VRAM |
-| **Hosted API** | Commercial / Frontier (`1536-d` – `3072-d`) | Remote API (**0 MB local RAM/VRAM**) | ~120–400 ms (network) | Cloud-ok workflows requiring zero local compute overhead |
 
 ```bash
 python examples/swap_demo.py --from-dim 8 --to-dim 16 --base-dir /tmp/swap-demo
@@ -282,14 +279,7 @@ pytest -v
 
 ## Benchmarks
 
-> **Note (Illustrative / Reference Values):** The figures below are **illustrative / expected reference values** from architectural characterization of a compact multilingual CPU embedding model (~100M parameters, 384-d `IndexFlatIP`) vs. a standard GPU-resident embedding pipeline. They are provided as reference design targets rather than hardware-bound claims.
-
-| Metric / Scenario | Flat RAG (GPU Embedder) | **Tree-RAG (CPU Offload — Reference Values)** | Architectural Impact |
-| :--- | :--- | :--- | :--- |
-| **GPU VRAM Allocated to Embeddings** | 650 – 1,400 MB VRAM | **0 MB VRAM** *(reference value, 100% CPU)* | 100% of GPU VRAM preserved for primary LLM KV-cache |
-| **Single Query Embed Latency (`v1`, batch=1)** | ~25 ms | **~160 ms** *(illustrative / expected on CPU)* | Negligible in agentic tool loops; zero GPU preemption |
-| **Batch Embed Latency (`batch=10` passages)** | ~45 ms | **~300 ms** *(illustrative / expected, ~30 ms/vec)* | Sub-linear amortization during `_pending` queue merge |
-| **False-Positive Pollution on Empty Workspace** | 100% (returns $k$ arbitrary neighbors) | **0.0%** (`EmptyContext` + HITL gate) | Eliminates cross-project context poisoning |
+No measured benchmark results are published yet. This repository intentionally contains no synthetic or estimated performance numbers. Benchmark tables will be added only after they are produced by a reproducible run on named hardware, with the exact command and raw output committed alongside.
 
 ---
 
